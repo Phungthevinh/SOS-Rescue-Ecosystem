@@ -122,18 +122,18 @@
 ### PHASE 0: Foundation & Setup (Tuần 1-2)
 
 - [ ] **Cấu trúc dự án**
-  - [ ] Khởi tạo Rust workspace `Cargo.toml` root
-  - [ ] Tạo crate `beacon_shared` (shared types)
-  - [ ] Tạo crate `beacon_server` (Axum backend)
-  - [ ] Tạo crate `beacon_core` (mobile Rust logic)
-  - [ ] Khởi tạo Flutter project `beacon_app`
+  - [x] Khởi tạo Rust workspace `Cargo.toml` root
+  - [x] Tạo crate `beacon_shared` (shared types)
+  - [x] Tạo crate `beacon_server` (Axum backend)
+  - [x] Tạo crate `beacon_core` (mobile Rust logic)
+  - [ ] Khởi tạo Flutter project `beacon_app` (Blocked - missing Flutter SDK)
   - [ ] Setup `flutter_rust_bridge` (Flutter ↔ Rust)
 
 - [ ] **Infrastructure**
-  - [ ] Tạo `docker-compose.yml` (PostgreSQL 16 + Redis 7)
-  - [ ] Tạo `.env.example` với tất cả config keys
-  - [ ] Viết database migrations (SQLx)
-  - [ ] Tạo `Makefile` / scripts tiện ích
+  - [x] Tạo `docker-compose.yml` (PostgreSQL 16 + Redis 7)
+  - [x] Tạo `.env.example` với tất cả config keys
+  - [x] Viết database migrations (SQLx)
+  - [x] Tạo `Makefile` / scripts tiện ích
 
 - [ ] **CI/CD**
   - [ ] GitHub Actions: Rust build + test
@@ -794,7 +794,9 @@ pub async fn emergency_sos(contacts: &[Contact; 5], location: GpsCoord) {
 
 | # | Vấn đề | Mức độ | Trạng thái | Giải pháp |
 |---|--------|--------|------------|-----------|
-| - | (Chưa có) | - | - | - |
+| 1 | Thiếu Flutter SDK (lệnh `flutter` not found) | High | 🔴 Blocked | Cần cài đặt Flutter SDK trên máy Windows và thêm vào PATH |
+| 2 | Docker Engine chưa bật | High | 🔴 Blocked | Cần khởi động ứng dụng Docker Desktop để chạy `docker-compose up` |
+| 3 | Thiếu `sqlx-cli` | Medium | 🟡 Pending | Cài bằng `cargo install sqlx-cli` sau khi database sẵn sàng |
 
 ---
 

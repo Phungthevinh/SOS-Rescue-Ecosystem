@@ -1,0 +1,35 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Flutter
+beacon_app/.dart_tool/
+beacon_app/.packages
+beacon_app/build/
+beacon_app/.flutter-plugins
+beacon_app/.flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+*.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Temporary
+*.tmp
+extract_pdf.py

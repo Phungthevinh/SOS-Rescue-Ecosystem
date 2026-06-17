@@ -126,7 +126,7 @@
   - [x] Tạo crate `beacon_shared` (shared types)
   - [x] Tạo crate `beacon_server` (Axum backend)
   - [x] Tạo crate `beacon_core` (mobile Rust logic)
-  - [ ] Khởi tạo Flutter project `beacon_app` (Blocked - missing Flutter SDK)
+  - [x] Khởi tạo Flutter project `beacon_app` (Đã dùng đường dẫn tuyệt đối)
   - [ ] Setup `flutter_rust_bridge` (Flutter ↔ Rust)
 
 - [ ] **Infrastructure**
@@ -438,16 +438,18 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
   - ✅ Tạo Implementation Plan chi tiết
   - ✅ Tạo Project Tracker (file này)
   - ✅ Bắt đầu Phase 1: Tạo Model `User` trong `beacon_shared`
+  - ✅ Hoàn thành Phase 0: Khởi tạo project Flutter `beacon_app`
+  - ✅ Thử nghiệm biên dịch và khởi chạy thành công `beacon_app` trên Windows Desktop
 - **Vấn đề:**
   - Chưa xác nhận: Tên dự án chính thức (Beacon vs SOS Rescue Ecosystem)
   - Chưa xác nhận: flutter_rust_bridge vs UniFFI
   - Chưa xác nhận: Kinh nghiệm Flutter của developer
   - Chưa xác nhận: Có Twilio/Firebase account chưa
   - Chưa xác nhận: Target Android only hay cả iOS
-  - 🔴 **MỚI**: Thiếu Flutter SDK (đang chặn Phase 0: khởi tạo `beacon_app`)
   - 🔴 **MỚI**: Docker Engine chưa kết nối được (đang chặn Phase 0: database migrations)
 - **Việc cần làm tiếp:**
-  - 🔜 User: Cài đặt Flutter SDK và khởi động Docker Desktop.
+  - 🔜 User: Khởi động Docker Desktop để test Database.
+  - 🔜 Phase 0: Setup `flutter_rust_bridge` để kết nối Flutter và Rust.
   - 🔜 Phase 1: Tiếp tục tạo các Model khác (`EmergencyContact`, `SosEvent`) và setup Axum server.
 
 ---

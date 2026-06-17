@@ -577,24 +577,174 @@ Redis Rate Limiting:
 - [ ] **Chế độ ẩn**: User có thể tắt radar visibility (không xuất hiện trên bản đồ người khác)
 - [ ] **Cooldown xem vị trí**: Không cho phép query vị trí 1 người cụ thể liên tục
 
-### TẦNG 6: Hệ thống Báo cáo & Xử lý (Report System)
+### TẦNG 6: Hệ thống Báo cáo Chống Lạm dụng Ngược (Anti-Weaponized Report System)
 
-- [ ] **Nút "Báo cáo SOS giả"**: Sau khi nhận SOS → nếu là giả → nhấn báo cáo
-- [ ] **Cơ chế xử lý tự động**:
-  - 1 report: Gắn cờ, giảm Trust Score -15
-  - 3 reports từ 3 users khác nhau: Tự động đình chỉ tài khoản 24h + review
-  - 5 reports: Ban vĩnh viễn + SĐT vào blacklist
-- [ ] **Lưu bằng chứng**: Mọi SOS event đều lưu log (GPS, thời gian, recording) → dùng làm bằng chứng nếu cần
-- [ ] **Admin dashboard**: Panel để admin review các report, unban nếu oan
+> ⚠️ **LỖ HỔNG ĐÃ PHÁT HIỆN**: Nhóm kẻ xấu (5 người) có thể dàn cảnh → bật SOS giả hoặc
+> tấn công nạn nhân thật → rồi đồng loạt REPORT nạn nhân → khiến nạn nhân bị BAN
+> → nạn nhân mất khả năng cầu cứu. **ĐÂY LÀ THẢM HỌA.**
+
+#### NGUYÊN TẮC SỐ 1 (BẤT KHẢ XÂM PHẠM):
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🔒 REPORT KHÔNG BAO GIỜ ĐƯỢC DỪNG MỘT SOS ĐANG HOẠT ĐỘNG    │
+│                                                                 │
+│  • SMS/Call tới 5 người thân    → LUÔN LUÔN được gửi           │
+│  • Radar cảnh báo cộng đồng    → LUÔN LUÔN hoạt động           │
+│  • GPS tracking lên server     → LUÔN LUÔN ghi nhận            │
+│  • Blackbox recording          → LUÔN LUÔN ghi âm              │
+│                                                                 │
+│  Report chỉ được XỬ LÝ SAU khi SOS event kết thúc + 72h.      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Cơ chế 1: SOS Immunity Lock (Khóa Miễn dịch khi SOS)
+
+- [ ] Khi SOS đang `active` → tài khoản vào trạng thái **IMMUNE** (bất khả xâm phạm)
+- [ ] Mọi report nhận trong thời gian SOS active → chỉ **xếp hàng chờ** (queued), KHÔNG xử lý
+- [ ] Sau khi SOS kết thúc (cancelled/resolved) → chờ thêm **72 giờ** → mới review reports
+- [ ] Trong 72h đó, nạn nhân vẫn sử dụng app bình thường
+
+```rust
+pub fn can_process_reports(event: &SosEvent) -> bool {
+    match event.status {
+        SosStatus::Active => false,  // KHÔNG BAO GIỜ xử lý khi SOS đang bật
+        SosStatus::Cancelled | SosStatus::Resolved => {
+            let hours_since_end = now() - event.resolved_at.unwrap();
+            hours_since_end >= Duration::hours(72) // Chờ 72h sau khi kết thúc
+        }
+    }
+}
+```
+
+#### Cơ chế 2: Report có Trọng số (Weighted Reports)
+
+> Không phải mọi report đều có giá trị ngang nhau.
+
+- [ ] Report từ tài khoản Trust Score < 30 → **trọng số 0.1** (gần như vô giá trị)
+- [ ] Report từ tài khoản Trust Score 30-60 → **trọng số 0.5**
+- [ ] Report từ tài khoản Trust Score 60-80 → **trọng số 1.0**
+- [ ] Report từ tài khoản Trust Score 80+ (đã xác minh CCCD) → **trọng số 2.0**
+- [ ] **Ngưỡng xử lý**: Tổng trọng số phải ≥ 5.0 mới trigger đình chỉ (chờ admin review)
+
+```
+Ví dụ kịch bản tấn công:
+  5 kẻ xấu (tài khoản mới, Trust Score ~25 mỗi người)
+  → 5 reports × trọng số 0.1 = 0.5 tổng
+  → 0.5 < 5.0 → KHÔNG ĐỦ ĐỂ ĐÌNH CHỈ ← Tấn công THẤT BẠI
+
+Ví dụ report hợp lệ:
+  3 người dùng uy tín (Trust Score 70+, xác minh CCCD)
+  → 1×2.0 + 2×1.0 = 4.0 → gần ngưỡng, admin review
+```
+
+#### Cơ chế 3: Phát hiện Thông đồng (Anti-Collusion Detection)
+
+- [ ] **Phát hiện nhóm report**: Nếu nhiều tài khoản report cùng 1 target trong < 10 phút → gắn cờ `COLLUSION_SUSPECTED`
+- [ ] **Phân tích đồ thị quan hệ (Social Graph)**:
+  - Các reporter từng ở gần nhau thường xuyên? → nghi ngờ quen biết
+  - Các reporter có cùng device fingerprint/IP range? → nghi ngờ cùng 1 người
+  - Các reporter tạo tài khoản cùng thời điểm? → nghi ngờ dàn cảnh
+- [ ] **Cluster detection**: Nếu 3+ reporter luôn report chung → đánh dấu là **Report Ring** → vô hiệu hóa toàn bộ report từ nhóm đó
+
+```sql
+-- Phát hiện collusion: Tìm nhóm users luôn report chung
+SELECT reporter_id, COUNT(DISTINCT target_event_id) as shared_reports
+FROM sos_reports r1
+WHERE EXISTS (
+    SELECT 1 FROM sos_reports r2
+    WHERE r2.target_event_id = r1.target_event_id
+    AND r2.reporter_id != r1.reporter_id
+    AND ABS(EXTRACT(EPOCH FROM (r2.created_at - r1.created_at))) < 600 -- < 10 phút
+)
+GROUP BY reporter_id
+HAVING COUNT(DISTINCT target_event_id) >= 3; -- Report chung ≥ 3 lần → COLLUSION
+```
+
+#### Cơ chế 4: Quyền Report có Điều kiện
+
+- [ ] **Trust Score < 40**: KHÔNG có quyền report người khác
+- [ ] **Tài khoản < 14 ngày**: KHÔNG có quyền report
+- [ ] **Mỗi user chỉ report được 1 lần/event**: Chặn 1 người report nhiều lần
+- [ ] **Giới hạn report**: Mỗi user chỉ report tối đa 3 event/tháng → chống spam report
+- [ ] **Report phải kèm lý do**: Chọn 1 trong các lý do có sẵn (không phải text tự do) + Optional ảnh/video chứng minh
+
+#### Cơ chế 5: Reporter cũng bị Giám sát (Reporter Accountability)
+
+- [ ] **Nếu report bị admin xác nhận là SAI** (nạn nhân thật bị report oan):
+  - Reporter bị **trừ 25 Trust Score**
+  - Reporter bị **cấm report 30 ngày**
+  - Nếu false report ≥ 3 lần → reporter bị **ban vĩnh viễn** (kẻ xấu bị loại ngược)
+- [ ] **Nếu phát hiện collusion ring**:
+  - TOÀN BỘ nhóm bị **ban vĩnh viễn** + SĐT vào blacklist
+  - Log toàn bộ bằng chứng → sẵn sàng cung cấp cho cơ quan chức năng
+
+```
+Kết quả kịch bản tấn công sau khi fix:
+
+    👿 A (Trust 25) ── report ──┐
+    👿 B (Trust 25) ── report ──┤
+    👿 C (Trust 25) ── report ──┼──→ 🆘 Nạn nhân (SOS ACTIVE)
+    👿 D (Trust 25) ── report ──┤         │
+    👿 E (Trust 25) ── report ──┘         │
+                                          ▼
+    ✅ SOS Immunity Lock → Reports bị QUEUED, KHÔNG xử lý
+    ✅ SMS/Call tới 5 người thân → ĐÃ GỬI THÀNH CÔNG
+    ✅ Radar cộng đồng → ĐANG HOẠT ĐỘNG
+    ✅ Blackbox recording → ĐANG GHI ÂM
+    
+    ... 72h sau SOS kết thúc ...
+    
+    ⚠️ Admin review reports:
+      → 5 reporter có Trust Score < 30 → Trọng số = 0.5 (< 5.0 ngưỡng)
+      → 5 reports trong < 10 phút → COLLUSION_SUSPECTED
+      → 5 reporters tạo tài khoản cùng tuần → XÁC NHẬN COLLUSION
+      
+    ❌ Reports bị HỦY
+    ❌ 5 kẻ xấu bị BAN VĨNH VIỄN ← Phản đòn
+    ✅ Nạn nhân được bảo vệ toàn diện
+```
+
+#### Cơ chế 6: Kênh Cứu hộ Song song Không thể Chặn (Unkillable Lifeline)
+
+> Ngay cả trong kịch bản TỆ NHẤT (account bị ban bằng cách nào đó), nạn nhân vẫn có đường sống.
+
+- [ ] **SMS Fallback trực tiếp**: Rust Core trên điện thoại tự gửi SMS trực tiếp đến 5 SĐT thân nhân mà KHÔNG qua server → server bị hack hay account bị ban vẫn gửi được
+- [ ] **Offline SOS**: Nếu mất mạng hoàn toàn → gửi SMS nội tại + bật còi hú trên loa
+- [ ] **Emergency bypass**: Nếu account bị đình chỉ → vẫn cho phép 1 SOS khẩn cấp cuối cùng (Emergency Override) với recording tự động → admin review sau
+- [ ] **Nút cứng 113/114**: Ngoài SOS cộng đồng, luôn hiển thị nút gọi thẳng 113 (Công an) / 114 (Cứu hỏa) / 115 (Cấp cứu) → không ai có thể chặn cuộc gọi khẩn cấp hệ thống
+
+```rust
+// Rust Core (chạy trên điện thoại - KHÔNG phụ thuộc server)
+pub async fn emergency_sos(contacts: &[Contact; 5], location: GpsCoord) {
+    // Kênh 1: Gửi qua server (có thể bị chặn bởi ban)
+    let server_result = api_client::send_sos(location).await;
+    
+    // Kênh 2: SMS trực tiếp từ SIM (KHÔNG QUA SERVER - KHÔNG THỂ CHẶN)
+    for contact in contacts {
+        sms::send_direct(
+            contact.phone,
+            format!("🆘 SOS! Tôi cần giúp đỡ! Vị trí: https://maps.google.com/?q={},{}", 
+                    location.lat, location.lng)
+        ).await;
+    }
+    
+    // Kênh 3: Nếu cả 2 kênh trên fail → bật còi hú max volume
+    if server_result.is_err() {
+        audio::play_siren_max_volume().await;
+    }
+}
+```
 
 ### TẦNG 7: Răn đe Pháp lý (Legal Deterrent)
 
 - [ ] **Cảnh báo trước khi phát SOS**: Popup "Phát SOS giả là hành vi vi phạm pháp luật. Mọi hoạt động đều được ghi nhận."
-- [ ] **Terms of Service**: Ghi rõ hậu quả pháp lý của việc lạm dụng SOS
+- [ ] **Cảnh báo trước khi report**: Popup "Báo cáo sai sự thật cũng là hành vi vi phạm. Tài khoản của bạn sẽ bị xử lý nếu report không trung thực."
+- [ ] **Terms of Service**: Ghi rõ hậu quả pháp lý của cả hai hành vi: SOS giả VÀ report giả
 - [ ] **Hợp tác cơ quan chức năng**: Cung cấp log cho công an khi có yêu cầu hợp pháp
-- [ ] **Điều khoản Việt Nam**: Theo Bộ luật Hình sự 2015, Điều 318 — "Gây rối trật tự công cộng" có thể bị phạt tù đến 7 năm
+- [ ] **Điều khoản Việt Nam**: BLHS 2015 Điều 318 (Gây rối trật tự - tù đến 7 năm) + Điều 155 (Vu khống - tù đến 3 năm)
 
-### Tóm tắt: Ma trận Phòng thủ
+### Tóm tắt: Ma trận Phòng thủ (Đã vá lỗ hổng Report Abuse)
 
 ```
                     ┌─────────────────────────────┐
@@ -622,11 +772,17 @@ Redis Rate Limiting:
                     └──────────────┬──────────────┘
                                    │
                     ┌──────────────▼──────────────┐
-                    │  TẦNG 6: Report + Auto-ban   │ ← Cộng đồng tự quản lý
+                    │  TẦNG 6: Anti-Report Abuse   │ ← SOS Immunity + Weighted Report
+                    │  + Collusion Detection       │   + Phản đòn kẻ report giả
                     └──────────────┬──────────────┘
                                    │
                     ┌──────────────▼──────────────┐
-                    │  TẦNG 7: Pháp lý răn đe     │ ← Hậu quả pháp luật
+                    │  TẦNG 7: Pháp lý răn đe     │ ← BLHS Điều 318 + Điều 155
+                    └──────────────┬──────────────┘
+                                   │
+                    ┌──────────────▼──────────────┐
+                    │  KÊNH SONG SONG: SMS trực    │ ← KHÔNG THỂ CHẶN bằng bất kỳ
+                    │  tiếp + 113/114/115          │   cách nào (bypass mọi hệ thống)
                     └─────────────────────────────┘
 ```
 

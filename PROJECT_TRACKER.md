@@ -145,7 +145,7 @@
 ### PHASE 1: Authentication & Core SOS (Tháng 1-2)
 
 #### 1.1 Backend - Auth System
-- [ ] Model `User` + migration
+- [x] Model `User` + migration
 - [ ] `POST /api/v1/auth/register` → Gửi OTP qua Twilio
 - [ ] `POST /api/v1/auth/verify-otp` → Xác thực OTP, tạo JWT
 - [ ] `POST /api/v1/auth/refresh` → Refresh access token
@@ -437,16 +437,18 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
   - ✅ Nhận diện 9 phần thiếu sót và bổ sung đầy đủ
   - ✅ Tạo Implementation Plan chi tiết
   - ✅ Tạo Project Tracker (file này)
+  - ✅ Bắt đầu Phase 1: Tạo Model `User` trong `beacon_shared`
 - **Vấn đề:**
   - Chưa xác nhận: Tên dự án chính thức (Beacon vs SOS Rescue Ecosystem)
   - Chưa xác nhận: flutter_rust_bridge vs UniFFI
   - Chưa xác nhận: Kinh nghiệm Flutter của developer
   - Chưa xác nhận: Có Twilio/Firebase account chưa
   - Chưa xác nhận: Target Android only hay cả iOS
+  - 🔴 **MỚI**: Thiếu Flutter SDK (đang chặn Phase 0: khởi tạo `beacon_app`)
+  - 🔴 **MỚI**: Docker Engine chưa kết nối được (đang chặn Phase 0: database migrations)
 - **Việc cần làm tiếp:**
-  - 🔜 Phase 0: Setup Rust workspace + project structure
-  - 🔜 Phase 0: Docker Compose setup
-  - 🔜 Phase 0: Database migrations
+  - 🔜 User: Cài đặt Flutter SDK và khởi động Docker Desktop.
+  - 🔜 Phase 1: Tiếp tục tạo các Model khác (`EmergencyContact`, `SosEvent`) và setup Axum server.
 
 ---
 

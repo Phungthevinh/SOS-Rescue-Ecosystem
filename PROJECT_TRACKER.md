@@ -12,8 +12,8 @@
 
 | Phase | Mô tả | Trạng thái | Timeline dự kiến |
 |-------|--------|------------|-------------------|
-| Phase 0 | Foundation & Setup | 🔲 Chưa bắt đầu | Tuần 1-2 |
-| Phase 1 | Auth & Core SOS (MVP) | 🔲 Chưa bắt đầu | Tháng 1-2 |
+| Phase 0 | Foundation & Setup | 🔵 Đang tiến hành (~80%) | Tuần 1-2 |
+| Phase 1 | Auth & Core SOS (MVP) | 🔵 Đang tiến hành (~5%) | Tháng 1-2 |
 | Phase 2 | Community Radar & Battery Optimization | 🔲 Chưa bắt đầu | Tháng 3-5 |
 | Phase 3 | BLE, Blackbox & Advanced Features | 🔲 Chưa bắt đầu | Tháng 6-7 |
 | Phase 4 | Testing, Security & Release | 🔲 Chưa bắt đầu | Tháng 8 |
@@ -56,23 +56,23 @@
 
 | Crate | Mục đích | Version | Đã cài? |
 |-------|----------|---------|---------|
-| `axum` | Web framework | latest | 🔲 |
-| `tokio` | Async runtime | 1.x | 🔲 |
-| `sqlx` | PostgreSQL driver (async) | 0.8.x | 🔲 |
-| `redis` | Redis client | latest | 🔲 |
-| `serde` / `serde_json` | Serialization | 1.x | 🔲 |
-| `jsonwebtoken` | JWT auth | latest | 🔲 |
+| `axum` | Web framework | 0.7 | ✅ workspace |
+| `tokio` | Async runtime | 1.37 | ✅ workspace |
+| `sqlx` | PostgreSQL driver (async) | 0.8 | ✅ workspace + beacon_shared |
+| `redis` | Redis client | 0.25 | ✅ workspace |
+| `serde` / `serde_json` | Serialization | 1.0 | ✅ workspace + beacon_shared |
+| `jsonwebtoken` | JWT auth | 9.3 | ✅ workspace |
 | `tower-http` | HTTP middleware (CORS, logging, rate-limit) | latest | 🔲 |
-| `argon2` | Password/PIN hashing | latest | 🔲 |
+| `argon2` | Password/PIN hashing | 0.5 | ✅ workspace |
 | `aes-gcm` | AES-256-GCM encryption | latest | 🔲 |
-| `reqwest` | HTTP client (Twilio API) | latest | 🔲 |
-| `tracing` + `tracing-subscriber` | Logging | latest | 🔲 |
-| `uuid` | Unique IDs | 1.x | 🔲 |
-| `chrono` | Date/time | latest | 🔲 |
-| `dotenvy` | .env config | latest | 🔲 |
-| `thiserror` / `anyhow` | Error handling | latest | 🔲 |
+| `reqwest` | HTTP client (Twilio API) | 0.12 | ✅ workspace |
+| `tracing` + `tracing-subscriber` | Logging | 0.1 / 0.3 | ✅ workspace |
+| `uuid` | Unique IDs | 1.8 | ✅ workspace + beacon_shared |
+| `chrono` | Date/time | 0.4 | ✅ workspace + beacon_shared |
+| `dotenvy` | .env config | 0.15 | ✅ workspace |
+| `thiserror` / `anyhow` | Error handling | 1.0 | ✅ workspace |
 | `validator` | Input validation | latest | 🔲 |
-| `flutter_rust_bridge` | Flutter ↔ Rust FFI | latest | 🔲 |
+| `flutter_rust_bridge` | Flutter ↔ Rust FFI | 2.0.0-dev.32 | ✅ workspace (chưa dùng) |
 
 ### Flutter Packages cần thiết
 
@@ -106,14 +106,14 @@
 
 | Tool | Yêu cầu | Đã cài? |
 |------|---------|---------|
-| Rust (rustup) | stable + nightly | ⬜ Kiểm tra |
-| Flutter SDK | 3.x | ⬜ Kiểm tra |
-| Docker & Docker Compose | PostgreSQL + Redis | ⬜ Kiểm tra |
+| Rust (rustup) | stable + nightly | ✅ Đã cài (cargo check OK) |
+| Flutter SDK | 3.x | ✅ Đã cài (beacon_app build OK) |
+| Docker & Docker Compose | PostgreSQL + Redis | ✅ Đã cài & chạy |
 | Android Studio / SDK | Android build | ⬜ Kiểm tra |
-| Xcode (macOS only) | iOS build | ⬜ Kiểm tra |
-| PostgreSQL 16 | Database | 🔲 |
-| Redis 7 | Geospatial cache | 🔲 |
-| sqlx-cli | DB migrations | 🔲 |
+| Xcode (macOS only) | iOS build | ⬜ N/A (Windows) |
+| PostgreSQL 16 | Database | ✅ Docker container `beacon_db` |
+| Redis 7 | Geospatial cache | ✅ Docker container `beacon_redis` |
+| sqlx-cli | DB migrations | 🔲 Chưa cài |
 
 ---
 
@@ -153,7 +153,7 @@
 - [ ] Rate limiting middleware
 
 #### 1.2 Backend - User & Contacts
-- [ ] Model `EmergencyContact` + migration
+- [ ] Model `EmergencyContact` + migration (✅ Model done)
 - [ ] `GET /api/v1/user/profile`
 - [ ] `PUT /api/v1/user/profile`
 - [ ] `PUT /api/v1/user/emergency-contacts`
@@ -161,7 +161,7 @@
 - [ ] Input validation (validator crate)
 
 #### 1.3 Backend - Core SOS Flow
-- [ ] Model `SosEvent` + `SosEventLog` + migrations
+- [ ] Model `SosEvent` + `SosEventLog` + migrations (✅ SosEvent model done)
 - [ ] `POST /api/v1/sos/activate` → Tạo event + trigger Twilio
 - [ ] `POST /api/v1/sos/cancel` → Verify PIN + hủy event
 - [ ] `POST /api/v1/sos/location` → Nhận GPS updates
@@ -440,17 +440,20 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
   - ✅ Bắt đầu Phase 1: Tạo Model `User` trong `beacon_shared`
   - ✅ Hoàn thành Phase 0: Khởi tạo project Flutter `beacon_app`
   - ✅ Thử nghiệm biên dịch và khởi chạy thành công `beacon_app` trên Windows Desktop
+  - ✅ Khởi động thành công Docker (PostgreSQL 16, Redis 7) qua `docker-compose`.
+  - ✅ Hoàn thiện các Model `EmergencyContact` và `SosEvent` trong `beacon_shared`.
 - **Vấn đề:**
   - Chưa xác nhận: Tên dự án chính thức (Beacon vs SOS Rescue Ecosystem)
   - Chưa xác nhận: flutter_rust_bridge vs UniFFI
   - Chưa xác nhận: Kinh nghiệm Flutter của developer
   - Chưa xác nhận: Có Twilio/Firebase account chưa
   - Chưa xác nhận: Target Android only hay cả iOS
-  - 🔴 **MỚI**: Docker Engine chưa kết nối được (đang chặn Phase 0: database migrations)
+  - ✅ **Đã giải quyết**: Docker Engine đã chạy thành công cùng PostgreSQL và Redis.
 - **Việc cần làm tiếp:**
-  - 🔜 User: Khởi động Docker Desktop để test Database.
-  - 🔜 Phase 0: Setup `flutter_rust_bridge` để kết nối Flutter và Rust.
-  - 🔜 Phase 1: Tiếp tục tạo các Model khác (`EmergencyContact`, `SosEvent`) và setup Axum server.
+  - 🔜 Backend: Setup Axum server (`beacon_server`), cấu hình kết nối Database (SQLx).
+  - 🔜 Backend: Viết database migrations cho các bảng đã định nghĩa.
+  - 🔜 Backend: Viết API `POST /api/v1/auth/register`.
+  - 🔜 Mobile: Setup `flutter_rust_bridge` để kết nối Flutter và Rust.
 
 ---
 

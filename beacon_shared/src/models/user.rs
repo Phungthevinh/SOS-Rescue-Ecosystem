@@ -13,6 +13,7 @@ pub struct User {
     pub pin_hash: Option<String>,
     pub voice_keyword: Option<String>,
     pub is_verified: Option<bool>,
+    pub trust_score: Option<i32>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }

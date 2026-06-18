@@ -1,58 +1,115 @@
--- Setup initial database schemas
+-- Drop existing tables if they exist
+DROP TABLE IF EXISTS otp_codes CASCADE;
+DROP TABLE IF EXISTS notifications_log CASCADE;
+DROP TABLE IF EXISTS devices CASCADE;
+DROP TABLE IF EXISTS recordings CASCADE;
+DROP TABLE IF EXISTS sos_event_logs CASCADE;
+DROP TABLE IF EXISTS sos_events CASCADE;
+DROP TABLE IF EXISTS emergency_contacts CASCADE;
+DROP TABLE IF EXISTS device_fingerprints CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table
-CREATE TABLE IF NOT EXISTS users (
+-- users
+CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    phone_number VARCHAR(20) UNIQUE NOT NULL,
-    full_name VARCHAR(100),
-    avatar_url VARCHAR(255),
-    trust_score INTEGER DEFAULT 30,
+    phone VARCHAR(20) UNIQUE NOT NULL,
+    name VARCHAR(100),
+    avatar_url TEXT,
+    role VARCHAR(20) DEFAULT 'user',  -- user, responder, admin
+    pin_hash VARCHAR(255),
+    voice_keyword VARCHAR(100),
     is_verified BOOLEAN DEFAULT FALSE,
+    trust_score INTEGER DEFAULT 30,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Device fingerprints for anti-abuse
-CREATE TABLE IF NOT EXISTS device_fingerprints (
+-- device_fingerprints
+CREATE TABLE device_fingerprints (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     device_hash VARCHAR(255) NOT NULL,
-    platform VARCHAR(20),
+    platform VARCHAR(10),
     is_emulator BOOLEAN DEFAULT FALSE,
     first_seen TIMESTAMPTZ DEFAULT NOW(),
     last_seen TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, device_hash)
 );
 
--- Emergency Contacts
-CREATE TABLE IF NOT EXISTS emergency_contacts (
+-- emergency_contacts
+CREATE TABLE emergency_contacts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    phone_number VARCHAR(20) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
     name VARCHAR(100) NOT NULL,
     relationship VARCHAR(50),
+    priority SMALLINT NOT NULL,  -- 1-5
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- SOS Events
-CREATE TABLE IF NOT EXISTS sos_events (
+-- sos_events
+CREATE TABLE sos_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    status VARCHAR(20) NOT NULL DEFAULT 'active', -- 'active', 'resolved', 'cancelled'
-    start_lat DOUBLE PRECISION NOT NULL,
-    start_lng DOUBLE PRECISION NOT NULL,
+    user_id UUID REFERENCES users(id),
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',  -- active, cancelled, resolved
+    trigger_method VARCHAR(20),  -- button, ble, voice, widget
     created_at TIMESTAMPTZ DEFAULT NOW(),
     resolved_at TIMESTAMPTZ
 );
 
--- SOS Event Logs (tracking locations during event)
-CREATE TABLE IF NOT EXISTS sos_event_logs (
+-- sos_event_logs (location history)
+CREATE TABLE sos_event_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_id UUID REFERENCES sos_events(id) ON DELETE CASCADE,
-    lat DOUBLE PRECISION NOT NULL,
-    lng DOUBLE PRECISION NOT NULL,
-    recorded_at TIMESTAMPTZ DEFAULT NOW()
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    battery_level SMALLINT,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- recordings
+CREATE TABLE recordings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID REFERENCES sos_events(id) ON DELETE CASCADE,
+    file_url TEXT NOT NULL,
+    encryption_key_hash VARCHAR(255),
+    duration_seconds INTEGER,
+    file_size_bytes BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- devices (FCM tokens + BLE devices)
+CREATE TABLE devices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    fcm_token TEXT,
+    platform VARCHAR(10),  -- android, ios
+    ble_device_id VARCHAR(100),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- notifications_log
+CREATE TABLE notifications_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID REFERENCES sos_events(id),
+    recipient_user_id UUID REFERENCES users(id),
+    type VARCHAR(20),  -- sms, voice, push, nearby
+    status VARCHAR(20),  -- sent, delivered, failed
+    sent_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- otp_codes
+CREATE TABLE otp_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone VARCHAR(20) NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );

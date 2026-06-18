@@ -12,8 +12,8 @@
 
 | Phase | Mô tả | Trạng thái | Timeline dự kiến |
 |-------|--------|------------|-------------------|
-| Phase 0 | Foundation & Setup | 🔵 Đang tiến hành (~80%) | Tuần 1-2 |
-| Phase 1 | Auth & Core SOS (MVP) | 🔵 Đang tiến hành (~5%) | Tháng 1-2 |
+| Phase 0 | Foundation & Setup | 🔵 Đang tiến hành (~90%) | Tuần 1-2 |
+| Phase 1 | Auth & Core SOS (MVP) | 🔵 Đang tiến hành (~10%) | Tháng 1-2 |
 | Phase 2 | Community Radar & Battery Optimization | 🔲 Chưa bắt đầu | Tháng 3-5 |
 | Phase 3 | BLE, Blackbox & Advanced Features | 🔲 Chưa bắt đầu | Tháng 6-7 |
 | Phase 4 | Testing, Security & Release | 🔲 Chưa bắt đầu | Tháng 8 |
@@ -316,8 +316,21 @@ CREATE TABLE users (
     pin_hash VARCHAR(255),
     voice_keyword VARCHAR(100),
     is_verified BOOLEAN DEFAULT FALSE,
+    trust_score INTEGER DEFAULT 30,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- device_fingerprints
+CREATE TABLE device_fingerprints (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    device_hash VARCHAR(255) NOT NULL,
+    platform VARCHAR(10),
+    is_emulator BOOLEAN DEFAULT FALSE,
+    first_seen TIMESTAMPTZ DEFAULT NOW(),
+    last_seen TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, device_hash)
 );
 
 -- emergency_contacts
@@ -429,6 +442,25 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
 ## 📝 Nhật ký Phát triển (Development Log)
 
 > Ghi lại mỗi session làm việc: ngày, việc đã làm, vấn đề gặp phải, việc cần làm tiếp.
+
+### 2026-06-18
+- **Việc đã làm (Buổi sáng):**
+  - ✅ Kiểm tra và đồng bộ hóa file migration `init.sql` với tài liệu thiết kế. Đã bổ sung 4 bảng còn thiếu.
+  - ✅ Khởi tạo lại Database (PostgreSQL) thành công với tổng cộng 9 bảng, giải quyết triệt để lỗi bất đồng bộ.
+  - ✅ Thêm trường `trust_score` vào model `User` trong Rust và Schema của Tracker.
+  - ✅ Xuất code DBML (DBDiagram) để biểu diễn trực quan hóa kiến trúc Database.
+  - ✅ Setup nền móng Backend: Axum Web Server + SQLx Connection Pool trong `beacon_server/src/main.rs`.
+  - ✅ Khai báo đầy đủ dependencies cho `beacon_server` (axum, tokio, sqlx, tracing, dotenvy).
+  - ✅ Tạo `AppState` struct chứa `PgPool` và inject vào Router qua `.with_state()`.
+  - ✅ Tạo endpoint `GET /health` (Health Check) cho hệ thống.
+  - ✅ Cấu hình đọc `PORT` và `DATABASE_URL` từ file `.env` (không hardcode).
+  - ✅ Code Review & Refactor: Sửa lỗi naming convention (snake_case), thay `unwrap()` bằng `expect()`, bổ sung logging (`tracing::info!`).
+  - ✅ `cargo check` — Biên dịch thành công, 0 warning, 0 error.
+- **Việc cần làm tiếp (Buổi chiều):**
+  - 🔜 Backend: Tách cấu trúc thư mục `beacon_server` (routes/, handlers/, config/) để chuẩn bị scale.
+  - 🔜 Backend: Viết API `POST /api/v1/auth/register` (Đăng ký bằng SĐT + gửi OTP).
+  - 🔜 Backend: JWT middleware (tower layer) cho xác thực.
+  - 🔜 Mobile: Setup `flutter_rust_bridge` để kết nối Flutter và Rust.
 
 ### 2026-06-17
 - **Việc đã làm:**

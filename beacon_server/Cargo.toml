@@ -7,3 +7,19 @@ description.workspace = true
 license.workspace = true
 
 [dependencies]
+# Nền tảng Core
+tokio = { version = "1.37", features = ["full"] }
+dotenvy = "0.15"
+
+# Web Framework
+axum = "0.7"
+
+# Database
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls", "uuid"] }
+
+# Logging (Rất quan trọng)
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Share Model từ crate chung
+beacon_shared = { path = "../beacon_shared" }

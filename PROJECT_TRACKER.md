@@ -616,6 +616,125 @@ Redis Rate Limiting:
 - [ ] **Chế độ ẩn**: User có thể tắt radar visibility (không xuất hiện trên bản đồ người khác)
 - [ ] **Cooldown xem vị trí**: Không cho phép query vị trí 1 người cụ thể liên tục
 
+#### 🔴 Phòng chống Location Inference Attack (Tam giác hóa vị trí)
+
+> ⚠️ **LỖ HỔNG ĐÃ PHÁT HIỆN**: Kẻ xấu tạo nhiều tài khoản, đứng ở nhiều vị trí khác nhau,
+> liên tục gọi `GET /radar/nearby` → thu thập khoảng cách tới target → vẽ vòng tròn giao nhau
+> → **suy luận ra vị trí chính xác** của người dùng khác (Trilateration Attack).
+> Đây là dạng tấn công phổ biến ở mọi ứng dụng xã hội dựa trên GPS.
+
+```
+Kịch bản tấn công:
+  Attacker tạo 5 tài khoản (A1..A5), mỗi tài khoản ở 1 vị trí khác nhau
+
+  A1 (10.762, 106.660) → thấy nạn nhân cách 1.2km
+  A2 (10.770, 106.665) → thấy nạn nhân cách 0.8km
+  A3 (10.758, 106.670) → thấy nạn nhân cách 1.5km
+
+  → Vẽ 3 vòng tròn (Trilateration) → giao điểm = vị trí chính xác nạn nhân
+```
+
+##### Lớp phòng thủ 5.1: Spatial Cloaking (Ưu tiên P0)
+
+> **Không bao giờ trả về khoảng cách chính xác** — chỉ trả về bucket thô.
+
+- [ ] Response từ `/radar/nearby` chỉ trả khoảng cách theo bậc thang: `< 500m`, `< 1km`, `< 2km`, `< 5km`
+- [ ] KHÔNG trả về giá trị khoảng cách số thực (vd: 847.32m)
+
+```rust
+// ❌ SAI — trả về khoảng cách chính xác → attacker tam giác hóa được
+{ "distance_m": 847.32 }
+
+// ✅ ĐÚNG — chỉ trả bucket thô → tam giác hóa thất bại
+{ "distance_label": "< 1km" }
+// Các bậc: < 500m, < 1km, < 2km, < 5km
+```
+
+##### Lớp phòng thủ 5.2: Grid Snapping — Làm mờ tọa độ (Ưu tiên P0)
+
+> Snap vị trí người dùng vào **lưới ô vuông ~200m** trước khi tính toán.
+> Mọi người trong cùng ô vuông cho kết quả giống hệt nhau → attacker không phân biệt được.
+
+- [ ] Implement hàm `snap_to_grid()` trên server trước khi xử lý bất kỳ query radar nào
+
+```rust
+fn snap_to_grid(lat: f64, lon: f64) -> (f64, f64) {
+    let precision = 0.002; // ~200m
+    let snapped_lat = (lat / precision).round() * precision;
+    let snapped_lon = (lon / precision).round() * precision;
+    (snapped_lat, snapped_lon)
+}
+```
+
+##### Lớp phòng thủ 5.3: Rate Limiting theo vị trí (Ưu tiên P1)
+
+- [ ] Giới hạn mỗi user: tối đa **5 lần query radar / phút**, **20 lần / giờ**
+- [ ] Nếu vị trí query thay đổi > 3 lần trong 5 phút → gắn cờ `SUSPICIOUS_MOVEMENT`
+- [ ] Redis key: `rate_limit:radar:{user_id}:minute` TTL 60s, `rate_limit:radar:{user_id}:hour` TTL 3600s
+
+##### Lớp phòng thủ 5.4: Random Offset Injection (Ưu tiên P1)
+
+> Thêm **nhiễu ngẫu nhiên ±15%** vào kết quả mỗi lần query.
+> Mỗi lần gọi API cùng một cặp (querier, target) → kết quả khác nhau → tam giác hóa bị sai.
+
+- [ ] Implement noise injection vào distance trước khi trả response
+
+```rust
+use rand::Rng;
+
+fn add_noise(distance_m: f64) -> f64 {
+    let mut rng = rand::thread_rng();
+    let noise = rng.gen_range(-0.15..0.15); // ±15%
+    distance_m * (1.0 + noise)
+}
+// 1000m → có thể trả về 850m hoặc 1150m (mỗi lần khác nhau)
+```
+
+##### Lớp phòng thủ 5.5: Result Cooldown (Ưu tiên P2)
+
+- [ ] Cùng một cặp (querier_id, target_id), **cache kết quả 5 phút** trong Redis
+- [ ] Dù attacker di chuyển và query lại → vẫn nhận kết quả cũ → tam giác hóa sai hoàn toàn
+- [ ] Redis key: `radar:cache:{querier_id}:{target_id}` TTL 300s
+
+##### Lớp phòng thủ 5.6: Anomaly Detection — Phát hiện bất thường (Ưu tiên P2)
+
+- [ ] Background job phát hiện pattern bất thường:
+  - User query radar > 50 lần/ngày → cảnh báo admin
+  - User thay đổi vị trí > 10 lần/giờ, khoảng cách > 5km → nghi ngờ bot/spoof GPS
+  - Nhiều user query cùng 1 target trong thời gian ngắn → nghi ngờ coordinated attack
+- [ ] Kết hợp với **Device Fingerprint** (Tầng 1): nếu 5 tài khoản dùng cùng device_hash/IP range → FLAG & BLOCK
+
+##### Ma trận phòng thủ Location Inference Attack
+
+| Lớp | Chống được gì | Độ phức tạp | Ưu tiên |
+|------|---------------|-------------|---------|
+| Spatial Cloaking | Tam giác hóa chính xác | Thấp | **P0** |
+| Grid Snapping | Suy luận vị trí chính xác | Thấp | **P0** |
+| Rate Limiting vị trí | Brute-force query | Trung bình | **P1** |
+| Random Offset | Phân tích thống kê | Thấp | **P1** |
+| Result Cooldown | Query liên tục lấy data mới | Thấp | **P2** |
+| Anomaly Detection | Tấn công phối hợp đa tài khoản | Cao | **P2** |
+
+##### Ngoại lệ khi SOS Active
+
+> **Khi KHÔNG có SOS event**: Áp dụng **tất cả 6 lớp** — bảo vệ privacy tối đa.
+>
+> **Khi CÓ SOS event đang active**: Chỉ **nới lỏng** cho rescuer đã verify (Trust Score >= 50)
+> trong bán kính phù hợp. Cần cân bằng giữa privacy và tính mạng.
+
+```rust
+pub fn get_location_precision(has_active_sos: bool, rescuer_trust: i32) -> LocationPrecision {
+    if has_active_sos && rescuer_trust >= 50 {
+        LocationPrecision::Exact       // Ưu tiên cứu mạng → cho vị trí chính xác
+    } else if has_active_sos && rescuer_trust >= 30 {
+        LocationPrecision::Grid200m    // Gần chính xác, nhưng vẫn có grid
+    } else {
+        LocationPrecision::BucketOnly  // Bình thường → chỉ bucket thô (< 500m, < 1km...)
+    }
+}
+```
+
+
 ### TẦNG 6: Hệ thống Báo cáo Chống Lạm dụng Ngược (Anti-Weaponized Report System)
 
 > ⚠️ **LỖ HỔNG ĐÃ PHÁT HIỆN**: Nhóm kẻ xấu (5 người) có thể dàn cảnh → bật SOS giả hoặc

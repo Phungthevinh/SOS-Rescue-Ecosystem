@@ -443,6 +443,14 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
 
 > Ghi lại mỗi session làm việc: ngày, việc đã làm, vấn đề gặp phải, việc cần làm tiếp.
 
+### 2026-06-21 (Pair Programming Session)
+- **Việc đã làm:**
+  - ✅ Cấu trúc lại `beacon_server`: Tách rời `config.rs`, `app_state.rs` và `routes/mod.rs` khỏi `main.rs`.
+  - ✅ Thiết lập **Global Error Handler** (`errors.rs`) sử dụng enum `AppError` và implement trait `IntoResponse`, tích hợp log.
+- **Vấn đề:** Đã giải quyết bug throw thiếu response body khi handle lỗi và tích hợp `From<sqlx::Error>`.
+- **Việc cần làm tiếp:**
+  - 🔜 Xây dựng API Đăng ký `POST /api/v1/auth/register` (nhận SĐT, tạo user, gửi OTP).
+
 ### 2026-06-18
 - **Việc đã làm (Buổi sáng):**
   - ✅ Kiểm tra và đồng bộ hóa file migration `init.sql` với tài liệu thiết kế. Đã bổ sung 4 bảng còn thiếu.

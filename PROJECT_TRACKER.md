@@ -146,7 +146,7 @@
 
 #### 1.1 Backend - Auth System
 - [x] Model `User` + migration
-- [ ] `POST /api/v1/auth/register` → Gửi OTP qua Twilio
+- [x] `POST /api/v1/auth/register` → Gửi OTP qua Twilio
 - [ ] `POST /api/v1/auth/verify-otp` → Xác thực OTP, tạo JWT
 - [ ] `POST /api/v1/auth/refresh` → Refresh access token
 - [ ] JWT middleware (tower layer)
@@ -449,7 +449,7 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
   - ✅ Thiết lập **Global Error Handler** (`errors.rs`) sử dụng enum `AppError` và implement trait `IntoResponse`, tích hợp log.
 - **Vấn đề:** Đã giải quyết bug throw thiếu response body khi handle lỗi và tích hợp `From<sqlx::Error>`.
 - **Việc cần làm tiếp:**
-  - 🔜 Xây dựng API Đăng ký `POST /api/v1/auth/register` (nhận SĐT, tạo user, gửi OTP).
+  - ✅ Xây dựng API Đăng ký `POST /api/v1/auth/register` (nhận SĐT, tạo user, gửi OTP).
 
 ### 2026-06-18
 - **Việc đã làm (Buổi sáng):**
@@ -466,7 +466,7 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
   - ✅ `cargo check` — Biên dịch thành công, 0 warning, 0 error.
 - **Việc cần làm tiếp (Buổi chiều):**
   - 🔜 Backend: Tách cấu trúc thư mục `beacon_server` (routes/, handlers/, config/) để chuẩn bị scale.
-  - 🔜 Backend: Viết API `POST /api/v1/auth/register` (Đăng ký bằng SĐT + gửi OTP).
+  - ✅ Backend: Viết API `POST /api/v1/auth/register` (Đăng ký bằng SĐT + gửi OTP).
   - 🔜 Backend: JWT middleware (tower layer) cho xác thực.
   - 🔜 Mobile: Setup `flutter_rust_bridge` để kết nối Flutter và Rust.
 
@@ -492,7 +492,7 @@ rate_limit:sos:{user_id}      → STRING with TTL (max 3/day)
 - **Việc cần làm tiếp:**
   - 🔜 Backend: Setup Axum server (`beacon_server`), cấu hình kết nối Database (SQLx).
   - 🔜 Backend: Viết database migrations cho các bảng đã định nghĩa.
-  - 🔜 Backend: Viết API `POST /api/v1/auth/register`.
+  - ✅ Backend: Viết API `POST /api/v1/auth/register`.
   - 🔜 Mobile: Setup `flutter_rust_bridge` để kết nối Flutter và Rust.
 
 ---

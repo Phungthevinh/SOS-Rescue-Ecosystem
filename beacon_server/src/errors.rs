@@ -8,6 +8,7 @@ use tracing::error;
 pub enum AppError {
     DatabaseError(sqlx::Error),
     InternalServerError(String),
+    BadRequest(String),
 }
 
 impl IntoResponse for AppError {
@@ -25,13 +26,17 @@ impl IntoResponse for AppError {
                 error!("Internal server error: {}", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, msg.clone())
             }
+            AppError::BadRequest(ref msg) => {
+                error!("Bad request: {}", msg);
+                (StatusCode::BAD_REQUEST, msg.clone())
+            }
         };
 
         // Gói JSON lại bằng axum::Json
         let body = axum::Json(json!({
             "error": err,
         }));
-        
+
         // Trả về tuple (StatusCode, JsonBody)
         (status, body).into_response()
     }
